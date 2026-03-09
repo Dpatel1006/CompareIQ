@@ -1,0 +1,63 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String?
+  googleId     String?      @unique
+  tier         Tier         @default(FREE)
+  preferences  Json?
+  comparisons  Comparison[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Product {
+  id           String       @id @default(cuid())
+  name         String
+  brand        String?
+  category     String
+  price        Float?
+  imageUrl     String?
+  specs        Json
+  rating       Float?
+  reviewCount  Int?
+  sourceUrl    String?
+  externalId   String?
+  comparisonsA Comparison[] @relation("ProductA")
+  comparisonsB Comparison[] @relation("ProductB")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Comparison {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  productAId String
+  productA   Product  @relation("ProductA", fields: [productAId], references: [id])
+  productBId String
+  productB   Product  @relation("ProductB", fields: [productBId], references: [id])
+  preferences Json?
+  result     Json
+  winnerId   String
+  isPublic   Boolean  @default(false)
+  shareToken String?  @unique
+  createdAt  DateTime @default(now())
+}
+
+enum Tier {
+  FREE
+  PRO
+  TEAM
+}
