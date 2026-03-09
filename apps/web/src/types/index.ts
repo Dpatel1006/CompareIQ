@@ -1,0 +1,20 @@
+// Re-export shared types from packages/types
+export type {
+  ComparisonResult,
+  CategoryScore,
+  ProductAnalysis,
+  CreateComparisonDto,
+  UserPreferences,
+  User,
+  AuthResponse,
+  RegisterDto,
+  LoginDto,
+  Product,
+  ProductSearchResult,
+  Comparison,
+  ComparisonListItem,
+  UserStats,
+  PaginatedResponse,
+  ApiError,
+  Tier,
+} from '../../../packages/types/src/index';
