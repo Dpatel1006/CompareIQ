@@ -10,7 +10,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ComparisonsService } from './comparisons.service';
 import { CreateComparisonDto } from './dto/create-comparison.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -64,10 +69,7 @@ export class ComparisonsController {
   @Get(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a single comparison by ID' })
-  async findById(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
+  async findById(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.comparisonsService.findById(id, userId);
   }
 
@@ -75,20 +77,14 @@ export class ComparisonsController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a comparison' })
-  async delete(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
+  async delete(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.comparisonsService.delete(id, userId);
   }
 
   @Patch(':id/share')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Make a comparison public and get share token' })
-  async makePublic(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
+  async makePublic(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.comparisonsService.makePublic(id, userId);
   }
 }

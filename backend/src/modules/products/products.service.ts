@@ -26,7 +26,9 @@ export class ProductsService {
     const localProducts = await this.prisma.product.findMany({
       where: {
         name: { contains: query, mode: 'insensitive' },
-        ...(category && { category: { equals: category, mode: 'insensitive' } }),
+        ...(category && {
+          category: { equals: category, mode: 'insensitive' },
+        }),
       },
       take: 10,
       select: {
@@ -55,9 +57,13 @@ export class ProductsService {
         if (!exists) {
           // Upsert into database
           const product = await this.prisma.product.upsert({
-            where: { id: `serper_${Buffer.from(result.title).toString('base64').slice(0, 20)}` },
+            where: {
+              id: `serper_${Buffer.from(result.title).toString('base64').slice(0, 20)}`,
+            },
             update: {
-              price: result.price ? parseFloat(result.price.replace(/[^0-9.]/g, '')) : null,
+              price: result.price
+                ? parseFloat(result.price.replace(/[^0-9.]/g, ''))
+                : null,
               imageUrl: result.imageUrl || null,
               rating: result.rating || null,
               reviewCount: result.ratingCount || null,
@@ -66,7 +72,9 @@ export class ProductsService {
               name: result.title,
               brand: this.extractBrand(result.title),
               category: category || 'General',
-              price: result.price ? parseFloat(result.price.replace(/[^0-9.]/g, '')) : null,
+              price: result.price
+                ? parseFloat(result.price.replace(/[^0-9.]/g, ''))
+                : null,
               imageUrl: result.imageUrl || null,
               specs: {},
               rating: result.rating || null,
@@ -88,7 +96,10 @@ export class ProductsService {
 
       return combined.slice(0, 10);
     } catch (error) {
-      this.logger.warn('Serper API search failed, returning local results only', error);
+      this.logger.warn(
+        'Serper API search failed, returning local results only',
+        error,
+      );
       return localProducts;
     }
   }
@@ -116,7 +127,10 @@ export class ProductsService {
     return product.id;
   }
 
-  private async searchSerper(query: string, category?: string): Promise<SerperProduct[]> {
+  private async searchSerper(
+    query: string,
+    category?: string,
+  ): Promise<SerperProduct[]> {
     const apiKey = this.configService.get<string>('SERPER_API_KEY');
     if (!apiKey || apiKey === 'your-serper-api-key') {
       return [];
@@ -151,9 +165,26 @@ export class ProductsService {
 
   private extractBrand(productName: string): string | null {
     const knownBrands = [
-      'Apple', 'Samsung', 'Google', 'Sony', 'Microsoft', 'Dell', 'HP',
-      'Lenovo', 'Asus', 'Acer', 'LG', 'Xiaomi', 'OnePlus', 'Nike',
-      'Adidas', 'Canon', 'Nikon', 'Bose', 'JBL', 'Dyson',
+      'Apple',
+      'Samsung',
+      'Google',
+      'Sony',
+      'Microsoft',
+      'Dell',
+      'HP',
+      'Lenovo',
+      'Asus',
+      'Acer',
+      'LG',
+      'Xiaomi',
+      'OnePlus',
+      'Nike',
+      'Adidas',
+      'Canon',
+      'Nikon',
+      'Bose',
+      'JBL',
+      'Dyson',
     ];
 
     for (const brand of knownBrands) {

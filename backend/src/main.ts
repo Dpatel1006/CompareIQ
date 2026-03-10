@@ -13,12 +13,15 @@ async function bootstrap() {
   // We also allow localhost:3000 as a hardcoded fallback so dev always works.
   const allowedOrigins = [
     process.env.ALLOWED_ORIGIN || 'http://localhost:3000',
-    'http://localhost:3000',  // always allow local frontend
+    'http://localhost:3000', // always allow local frontend
     'http://127.0.0.1:3000',
   ];
 
   app.enableCors({
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // Allow requests with no origin (curl, Postman, mobile apps, SSR)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
@@ -35,7 +38,7 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      stopAtFirstError: false,     // collect ALL validation errors
+      stopAtFirstError: false, // collect ALL validation errors
     }),
   );
 

@@ -54,7 +54,7 @@ export class ComparisonsService {
         userId: userId || null,
         productAId,
         productBId,
-        preferences: dto.preferences as any || null,
+        preferences: (dto.preferences as any) || null,
         result: aiResult as any,
         winnerId,
       },
@@ -109,8 +109,12 @@ export class ComparisonsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          productA: { select: { id: true, name: true, category: true, imageUrl: true } },
-          productB: { select: { id: true, name: true, category: true, imageUrl: true } },
+          productA: {
+            select: { id: true, name: true, category: true, imageUrl: true },
+          },
+          productB: {
+            select: { id: true, name: true, category: true, imageUrl: true },
+          },
         },
       }),
       this.prisma.comparison.count({ where }),
