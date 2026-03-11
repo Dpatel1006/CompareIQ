@@ -30,6 +30,25 @@ export interface AppConfig {
     clientSecret: string;
     callbackUrl: string;
   };
+  redis: {
+    host: string;
+    port: number;
+    password?: string;
+    ttl: number;
+  };
+  stripe: {
+    secretKey: string;
+    webhookSecret: string;
+    proPriceId: string;
+    teamPriceId: string;
+  };
+  mail: {
+    host: string;
+    port: number;
+    user: string;
+    pass: string;
+    from: string;
+  };
 }
 
 export function loadAppConfig(): AppConfig {
@@ -79,6 +98,25 @@ export function loadAppConfig(): AppConfig {
         'GOOGLE_CALLBACK_URL',
         'http://localhost:3001/auth/google/callback',
       ),
+    },
+    redis: {
+      host: optional('REDIS_HOST', 'localhost'),
+      port: parseInt(optional('REDIS_PORT', '6379'), 10),
+      password: process.env.REDIS_PASSWORD || undefined,
+      ttl: parseInt(optional('REDIS_TTL', '86400'), 10), // Default: 24 hours
+    },
+    stripe: {
+      secretKey: optional('STRIPE_SECRET_KEY', ''),
+      webhookSecret: optional('STRIPE_WEBHOOK_SECRET', ''),
+      proPriceId: optional('STRIPE_PRO_PRICE_ID', 'price_pro_default'),
+      teamPriceId: optional('STRIPE_TEAM_PRICE_ID', 'price_team_default'),
+    },
+    mail: {
+      host: optional('MAIL_HOST', 'smtp.ethereal.email'),
+      port: parseInt(optional('MAIL_PORT', '587'), 10),
+      user: optional('MAIL_USER', ''),
+      pass: optional('MAIL_PASS', ''),
+      from: optional('MAIL_FROM', '"CompareIQ" <hello@compareiq.app>'),
     },
   };
 }

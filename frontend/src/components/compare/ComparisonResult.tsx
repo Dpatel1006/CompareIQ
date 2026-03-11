@@ -5,6 +5,8 @@ import { ProductCard } from './ProductCard';
 import { CategoryBreakdown } from './CategoryBreakdown';
 import { ReasoningSection } from './ReasoningSection';
 import { ShareButton } from './ShareButton';
+import { RelatedComparisons } from './RelatedComparisons';
+import { ExportPdfButton } from './ExportPdfButton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -45,22 +47,18 @@ interface ComparisonResultProps {
       verdict?: string;
       reasoning?: string;
       recommendation?: string;
-      productA: AiProductResult;
-      productB: AiProductResult;
-      categories: AiCategory[];
-      bestFor?: { productA: string; productB: string };
+      products: Record<string, AiProductResult>;
+      categories: any[];
     };
   };
   showShare?: boolean;
 }
 
 /** Compute 0-10 overall score from category averages, fallback to rating*2 */
-function deriveScore(product: AiProductResult, side: 'A' | 'B', categories: AiCategory[]): number {
+function deriveScore(product: AiProductResult, productId: string, categories: any[]): number {
+  const scoreKey = `${productId}Score`;
   const catScores = categories
-    .map((c) => side === 'A'
-      ? (c.productAScore ?? c.scoreA)
-      : (c.productBScore ?? c.scoreB)
-    )
+    .map((c) => c[scoreKey])
     .filter((s): s is number => typeof s === 'number' && !isNaN(s));
 
   if (catScores.length > 0) {
@@ -76,18 +74,12 @@ export function ComparisonResult({ comparison, showShare = true }: ComparisonRes
   const router = useRouter();
   const { result } = comparison;
 
-  const scoreA = deriveScore(result.productA, 'A', result.categories);
-  const scoreB = deriveScore(result.productB, 'B', result.categories);
-
-  // winner can be "productA"/"productB"/"tie" OR actual product name
-  const isAWinner =
-    result.winner === 'productA' ||
-    result.winner === result.productA.name ||
-    (result.winner === 'tie' ? scoreA >= scoreB : false);
+  const productIds = Object.keys(result.products || {});
+  const ACCENT_COLORS = ['indigo', 'violet', 'purple', 'fuchsia'] as const;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div id="comparison-result" className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <Button
           variant="ghost"
           onClick={() => router.push('/compare')}
@@ -99,12 +91,18 @@ export function ComparisonResult({ comparison, showShare = true }: ComparisonRes
 
         <div className="flex items-center gap-2">
           {showShare && (
-            <ShareButton
-              comparisonId={comparison.id}
-              isPublic={comparison.isPublic}
-              shareToken={comparison.shareToken}
-            />
+            <div data-share-button>
+              <ShareButton
+                comparisonId={comparison.id}
+                isPublic={comparison.isPublic}
+                shareToken={comparison.shareToken}
+              />
+            </div>
           )}
+          <ExportPdfButton
+            elementId="comparison-result"
+            filename={`comparison-${comparison.id}`}
+          />
           <Button
             variant="outline"
             onClick={() => router.push('/compare')}
@@ -120,37 +118,38 @@ export function ComparisonResult({ comparison, showShare = true }: ComparisonRes
         <WinnerBadge winner={result.winner} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ProductCard
-          name={result.productA.name}
-          brand={result.productA.brand}
-          score={scoreA}
-          pros={result.productA.pros || []}
-          cons={result.productA.cons || []}
-          isWinner={isAWinner}
-          accentColor="indigo"
-        />
-        <ProductCard
-          name={result.productB.name}
-          brand={result.productB.brand}
-          score={scoreB}
-          pros={result.productB.pros || []}
-          cons={result.productB.cons || []}
-          isWinner={!isAWinner}
-          accentColor="violet"
-        />
+      <div className={`grid grid-cols-1 md:grid-cols-${Math.min(productIds.length, 4)} gap-4`}>
+        {productIds.map((id, index) => {
+          const product = result.products[id];
+          const score = deriveScore(product, id, result.categories);
+          const isWinner = result.winner === id || result.winner === product.name || result.winner === 'tie';
+
+          return (
+            <ProductCard
+              key={id}
+              name={product.name}
+              brand={product.brand}
+              score={score}
+              pros={product.pros || []}
+              cons={product.cons || []}
+              isWinner={isWinner}
+              accentColor={ACCENT_COLORS[index % ACCENT_COLORS.length]}
+            />
+          );
+        })}
       </div>
 
       <CategoryBreakdown
         categories={result.categories}
-        productAName={result.productA.name}
-        productBName={result.productB.name}
+        products={result.products}
       />
 
       <ReasoningSection
         verdict={result.summary ?? result.verdict ?? ''}
         reasoning={result.recommendation ?? result.reasoning ?? ''}
       />
+
+      <RelatedComparisons comparisonId={comparison.id} />
     </div>
   );
 }

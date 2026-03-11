@@ -32,9 +32,9 @@ export default function LoginPage() {
                 </Link>
               </p>
               <p>
-                <button disabled className="font-medium text-gray-400 cursor-not-allowed">
+                <Link href="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
                   Forgot password?
-                </button>
+                </Link>
               </p>
             </div>
           </div>

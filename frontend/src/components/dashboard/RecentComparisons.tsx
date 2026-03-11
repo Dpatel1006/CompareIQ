@@ -8,8 +8,7 @@ import { ArrowRight, Trophy } from 'lucide-react';
 
 interface ComparisonItem {
   id: string;
-  productAName: string;
-  productBName: string;
+  products: { id: string; name: string }[];
   winner: string;
   createdAt: string;
 }
@@ -62,7 +61,7 @@ export function RecentComparisons({ comparisons }: RecentComparisonsProps) {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {comp.productAName} vs {comp.productBName}
+                    {comp.products?.map((p) => p.name).join(' vs ')}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <Badge variant="outline" className="text-xs gap-1">

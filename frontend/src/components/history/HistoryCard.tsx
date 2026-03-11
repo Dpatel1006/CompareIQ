@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button';
 
 interface HistoryItem {
   id: string;
-  productAName: string;
-  productBName: string;
+  products: { id: string; name: string }[];
   winner: string;
   createdAt: string;
 }
@@ -27,14 +26,13 @@ export function HistoryCard({ item, onDelete }: HistoryCardProps) {
         className="flex-1 min-w-0 flex items-center gap-4"
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-gray-900 dark:text-white truncate">
-              {item.productAName}
-            </span>
-            <span className="text-gray-400 shrink-0">vs</span>
-            <span className="font-medium text-gray-900 dark:text-white truncate">
-              {item.productBName}
-            </span>
+          <div className="flex items-center flex-wrap gap-2 text-sm">
+            {item.products?.map((p, i) => (
+              <span key={p.id || i} className="font-medium text-gray-900 dark:text-white truncate flex items-center">
+                {p.name}
+                {i < item.products.length - 1 && <span className="text-gray-400 mx-2 font-normal shrink-0">vs</span>}
+              </span>
+            ))}
           </div>
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="outline" className="text-xs gap-1">

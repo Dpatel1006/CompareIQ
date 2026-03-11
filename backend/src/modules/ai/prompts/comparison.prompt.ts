@@ -325,19 +325,17 @@ export function detectProductCategory(productName: string): string {
 }
 
 /**
- * Build a tailored comparison prompt with product-specific comparison axes.
+ * Build a tailored comparison prompt for 2 to 4 products.
  */
 export function buildComparisonPrompt(
-  productAName: string,
-  productBName: string,
+  productNames: string[],
   preferences?: Preferences,
 ): string {
-  // Detect category using both product names
-  const catA = detectProductCategory(productAName);
-  const catB = detectProductCategory(productBName);
-  // Use the more specific category (prefer non-general)
+  // Detect category using all product names
+  const categories = productNames.map(detectProductCategory);
+  // Use the most specific category
   const category =
-    catA !== 'general' ? catA : catB !== 'general' ? catB : 'general';
+    categories.find((c) => c !== 'general') || 'general';
   const axes = CATEGORY_AXES[category];
 
   let preferencesSection = '';
@@ -354,62 +352,56 @@ export function buildComparisonPrompt(
   }
 
   const axesList = axes.map((a, i) => `${i + 1}. ${a}`).join('\n');
+  const productsList = productNames
+    .map((name, i) => `Product ${String.fromCharCode(65 + i)}: ${name}`)
+    .join('\n');
+
+  const idList = productNames.map((_, i) => `product${String.fromCharCode(65 + i)}`);
 
   return `You are an expert product comparison analyst specializing in ${category} products.
 
-Compare the following two products in detail:
+Compare the following ${productNames.length} products in detail:
 
-Product A: ${productAName}
-Product B: ${productBName}${preferencesSection}
+${productsList}${preferencesSection}
 
-Analyze both products across these specific categories for ${category}:
+Analyze all products across these specific categories for ${category}:
 ${axesList}
 
 For each category, score each product from 0-10 and provide clear reasoning.
 
 Return a comparison with:
-- A clear winner (or tie if genuinely equal)
+- A clear winner
 - A 2-3 sentence summary verdict
 - Pros and cons for each product (minimum 3 each)
 - Key specifications and attributes relevant to ${category}
 - Who each product is best suited for
 - A detailed recommendation paragraph
 
-You MUST respond with valid JSON matching this exact schema:
+You MUST respond with valid JSON matching this exact structure:
 {
-  "winner": "productA" | "productB" | "tie",
-  "winnerName": "string (the actual product name of the winner, or both names if tie)",
-  "summary": "string (2-3 sentence plain English verdict)",
+  "winner": "${idList.join(' | ')} | tie",
+  "winnerName": "string (name of winner)",
+  "summary": "string",
   "categories": [
     {
-      "name": "string (category name exactly as listed above)",
-      "productAScore": number (0-10),
-      "productBScore": number (0-10),
-      "winner": "productA" | "productB" | "tie",
-      "reasoning": "string (1-2 sentence explanation)"
+      "name": "string",
+      ${idList.map(id => `"${id}Score": number`).join(',\n      ')},
+      "winner": "${idList.join(' | ')} | tie",
+      "reasoning": "string"
     }
   ],
-  "productA": {
-    "name": "string",
-    "price": number | null (estimated retail price in INR or USD as applicable),
-    "pros": ["string", "string", "string"],
-    "cons": ["string", "string"],
-    "rating": number | null (out of 5),
-    "keySpecs": { "key": "value" }
+  "products": {
+    ${idList.map(id => `"${id}": {
+      "name": "string",
+      "price": number | null,
+      "pros": ["string"],
+      "cons": ["string"],
+      "rating": number | null,
+      "keySpecs": { "key": "value" },
+      "bestFor": "string"
+    }`).join(',\n    ')}
   },
-  "productB": {
-    "name": "string",
-    "price": number | null,
-    "pros": ["string", "string", "string"],
-    "cons": ["string", "string"],
-    "rating": number | null (out of 5),
-    "keySpecs": { "key": "value" }
-  },
-  "bestFor": {
-    "productA": "string (Best for users who...)",
-    "productB": "string (Best for users who...)"
-  },
-  "recommendation": "string (1 detailed paragraph full recommendation)"
+  "recommendation": "string"
 }
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no extra text before or after.`;

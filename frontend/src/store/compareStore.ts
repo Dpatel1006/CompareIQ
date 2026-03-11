@@ -18,40 +18,52 @@ interface Preferences {
 }
 
 interface CompareState {
-  productA: ProductSelection | null;
-  productB: ProductSelection | null;
+  products: (ProductSelection | null)[];
   preferences: Preferences;
   isComparing: boolean;
 
-  setProductA: (product: ProductSelection | null) => void;
-  setProductB: (product: ProductSelection | null) => void;
+  setProduct: (index: number, product: ProductSelection | null) => void;
+  addProduct: () => void;
+  removeProduct: (index: number) => void;
   setPreferences: (preferences: Preferences) => void;
   setIsComparing: (isComparing: boolean) => void;
   reset: () => void;
-  swapProducts: () => void;
 }
 
 export const useCompareStore = create<CompareState>((set, get) => ({
-  productA: null,
-  productB: null,
+  products: [null, null], // Initialize with 2 slots
   preferences: {},
   isComparing: false,
 
-  setProductA: (product) => set({ productA: product }),
-  setProductB: (product) => set({ productB: product }),
+  setProduct: (index, product) => {
+    const products = [...get().products];
+    products[index] = product;
+    set({ products });
+  },
+
+  addProduct: () => {
+    const products = [...get().products];
+    if (products.length < 4) {
+      products.push(null);
+      set({ products });
+    }
+  },
+
+  removeProduct: (index) => {
+    const products = [...get().products];
+    if (products.length > 2) {
+      products.splice(index, 1);
+      set({ products });
+    }
+  },
+
   setPreferences: (preferences) => set({ preferences }),
   setIsComparing: (isComparing) => set({ isComparing }),
 
   reset: () =>
     set({
-      productA: null,
-      productB: null,
+      products: [null, null],
       preferences: {},
       isComparing: false,
     }),
-
-  swapProducts: () => {
-    const { productA, productB } = get();
-    set({ productA: productB, productB: productA });
-  },
 }));

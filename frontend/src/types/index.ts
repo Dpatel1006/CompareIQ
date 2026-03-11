@@ -73,9 +73,8 @@ export interface ProductSearchResult
 
 export interface CategoryScore {
   name: string;
-  productAScore: number;
-  productBScore: number;
-  winner: Winner;
+  [key: string]: string | number; // For dynamic product scores (e.g. productAScore)
+  winner: string;
   reasoning: string;
 }
 
@@ -86,24 +85,22 @@ export interface ProductAnalysis {
   cons: string[];
   rating: number | null;
   keySpecs: Record<string, string>;
+  bestFor: string;
 }
 
 export interface ComparisonResult {
-  winner: Winner;
+  winner: string;
   winnerName: string;
   summary: string;
   categories: CategoryScore[];
-  productA: ProductAnalysis;
-  productB: ProductAnalysis;
-  bestFor: { productA: string; productB: string };
+  products: Record<string, ProductAnalysis>;
   recommendation: string;
 }
 
 export interface Comparison {
   id: string;
   userId: string | null;
-  productA: Product;
-  productB: Product;
+  products: Product[];
   preferences: UserPreferences | null;
   result: ComparisonResult;
   winnerId: string;
@@ -114,18 +111,13 @@ export interface Comparison {
 
 export interface ComparisonListItem {
   id: string;
-  productAName: string;
-  productBName: string;
-  productAImage: string | null;
-  productBImage: string | null;
+  products: { id: string; name: string; category: string; imageUrl: string | null }[];
   winner: string;
-  category: string;
   createdAt: string;
 }
 
 export interface CreateComparisonInput {
-  productAName: string;
-  productBName: string;
+  productNames: string[];
   preferences?: UserPreferences;
 }
 

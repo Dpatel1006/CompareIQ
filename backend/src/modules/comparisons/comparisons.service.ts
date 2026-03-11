@@ -18,61 +18,52 @@ export class ComparisonsService {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly productsService: ProductsService,
-  ) {}
+  ) { }
 
   async create(dto: CreateComparisonDto, userId?: string) {
     this.logger.log(
-      `Creating comparison: ${dto.productAName} vs ${dto.productBName}`,
+      `Creating comparison for: ${dto.productNames.join(', ')}`,
     );
 
     // 1. Find or create products
-    const [productAId, productBId] = await Promise.all([
-      this.productsService.findOrCreateByName(dto.productAName),
-      this.productsService.findOrCreateByName(dto.productBName),
-    ]);
+    const productIds = await Promise.all(
+      dto.productNames.map((name) => this.productsService.findOrCreateByName(name)),
+    );
 
     // 2. Call AI for comparison
     const aiResult = await this.aiService.compareProducts(
-      dto.productAName,
-      dto.productBName,
+      dto.productNames,
       dto.preferences,
     );
 
-    // 3. Determine winnerId
-    let winnerId: string;
-    if (aiResult.winner === 'productA') {
-      winnerId = 'productA';
-    } else if (aiResult.winner === 'productB') {
-      winnerId = 'productB';
-    } else {
-      winnerId = 'tie';
+    // 3. Map winnerId to actual Product ID if possible
+    let winnerId = aiResult.winner;
+    if (winnerId.startsWith('product') && winnerId !== 'tie') {
+      const charCode = winnerId.charAt(7).toUpperCase().charCodeAt(0);
+      const index = charCode - 65; // A -> 0, B -> 1, C -> 2, D -> 3
+      if (productIds[index]) {
+        winnerId = productIds[index];
+      }
     }
 
     // 4. Save comparison to database
     const comparison = await this.prisma.comparison.create({
       data: {
         userId: userId || null,
-        productAId,
-        productBId,
+        products: {
+          connect: productIds.map((id) => ({ id })),
+        },
         preferences: (dto.preferences as any) || null,
         result: aiResult as any,
         winnerId,
       },
       include: {
-        productA: true,
-        productB: true,
+        products: true,
       },
     });
 
     return {
-      id: comparison.id,
-      productA: comparison.productA,
-      productB: comparison.productB,
-      preferences: comparison.preferences,
-      result: comparison.result,
-      winnerId: comparison.winnerId,
-      isPublic: comparison.isPublic,
-      shareToken: comparison.shareToken,
+      ...comparison,
       createdAt: comparison.createdAt.toISOString(),
     };
   }
@@ -89,52 +80,44 @@ export class ComparisonsService {
     const where: any = { userId };
 
     if (search) {
-      where.OR = [
-        { productA: { name: { contains: search, mode: 'insensitive' } } },
-        { productB: { name: { contains: search, mode: 'insensitive' } } },
-      ];
+      where.products = {
+        some: {
+          name: { contains: search, mode: 'insensitive' },
+        },
+      };
     }
 
     if (category) {
-      where.OR = [
-        ...(where.OR || []),
-        { productA: { category: { equals: category, mode: 'insensitive' } } },
-      ];
+      where.products = {
+        some: {
+          category: { contains: category, mode: 'insensitive' },
+        },
+      };
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.comparison.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          productA: {
-            select: { id: true, name: true, category: true, imageUrl: true },
-          },
-          productB: {
-            select: { id: true, name: true, category: true, imageUrl: true },
-          },
-        },
-      }),
-      this.prisma.comparison.count({ where }),
-    ]);
+    const comparisons = await this.prisma.comparison.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        products: true,
+      },
+    });
+
+    const total = await this.prisma.comparison.count({ where });
 
     return {
-      data: data.map((c) => ({
-        id: c.id,
-        productAName: c.productA.name,
-        productBName: c.productB.name,
-        productAImage: c.productA.imageUrl,
-        productBImage: c.productB.imageUrl,
-        winner: c.winnerId,
-        category: c.productA.category,
+      data: comparisons.map((c) => ({
+        ...c,
         createdAt: c.createdAt.toISOString(),
       })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -142,8 +125,7 @@ export class ComparisonsService {
     const comparison = await this.prisma.comparison.findUnique({
       where: { id },
       include: {
-        productA: true,
-        productB: true,
+        products: true,
       },
     });
 
@@ -159,8 +141,7 @@ export class ComparisonsService {
     return {
       id: comparison.id,
       userId: comparison.userId,
-      productA: comparison.productA,
-      productB: comparison.productB,
+      products: comparison.products,
       preferences: comparison.preferences,
       result: comparison.result,
       winnerId: comparison.winnerId,
@@ -214,12 +195,43 @@ export class ComparisonsService {
     return { shareToken: updated.shareToken };
   }
 
+  async getRelated(id: string, limit = 3) {
+    const comparison = await this.prisma.comparison.findUnique({
+      where: { id },
+      include: { products: true },
+    });
+
+    if (!comparison) return [];
+
+    const category = (comparison.result as any)?.category || 'general';
+    const productIds = comparison.products.map(p => p.id);
+
+    const related = await this.prisma.comparison.findMany({
+      where: {
+        id: { not: id },
+        OR: [
+          { products: { some: { category } } },
+          { products: { some: { id: { in: productIds } } } },
+        ],
+      },
+      include: {
+        products: true,
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return related.map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
   async findByShareToken(token: string) {
     const comparison = await this.prisma.comparison.findUnique({
       where: { shareToken: token },
       include: {
-        productA: true,
-        productB: true,
+        products: true,
       },
     });
 
@@ -228,14 +240,7 @@ export class ComparisonsService {
     }
 
     return {
-      id: comparison.id,
-      productA: comparison.productA,
-      productB: comparison.productB,
-      preferences: comparison.preferences,
-      result: comparison.result,
-      winnerId: comparison.winnerId,
-      isPublic: comparison.isPublic,
-      shareToken: comparison.shareToken,
+      ...comparison,
       createdAt: comparison.createdAt.toISOString(),
     };
   }

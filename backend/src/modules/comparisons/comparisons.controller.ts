@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,13 +21,15 @@ import { ComparisonsService } from './comparisons.service';
 import { CreateComparisonDto } from './dto/create-comparison.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { TierLimitGuard } from '../../common/guards/tier-limit.guard';
 
 @ApiTags('Comparisons')
 @Controller('comparisons')
 export class ComparisonsController {
-  constructor(private readonly comparisonsService: ComparisonsService) {}
+  constructor(private readonly comparisonsService: ComparisonsService) { }
 
   @Post()
+  @UseGuards(TierLimitGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new AI comparison' })
   async create(
@@ -86,5 +89,12 @@ export class ComparisonsController {
   @ApiOperation({ summary: 'Make a comparison public and get share token' })
   async makePublic(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.comparisonsService.makePublic(id, userId);
+  }
+
+  @Get(':id/related')
+  @Public()
+  @ApiOperation({ summary: 'Get related comparisons' })
+  async getRelated(@Param('id') id: string) {
+    return this.comparisonsService.getRelated(id);
   }
 }

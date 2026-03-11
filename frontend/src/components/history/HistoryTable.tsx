@@ -8,8 +8,7 @@ import { Trophy, Trash2, Eye, Share2 } from 'lucide-react';
 
 interface HistoryItem {
   id: string;
-  productAName: string;
-  productBName: string;
+  products: { id: string; name: string }[];
   winner: string;
   createdAt: string;
   isPublic: boolean;
@@ -39,14 +38,13 @@ export function HistoryTable({ items, onDelete }: HistoryTableProps) {
               key={item.id}
               className="border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
-              <td className="px-4 py-3">
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {item.productAName}
-                </span>
-                <span className="text-gray-400 mx-2">vs</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {item.productBName}
-                </span>
+              <td className="px-4 py-3 flex items-center flex-wrap gap-1">
+                {item.products?.map((p, i) => (
+                  <span key={p.id || i} className="font-medium text-gray-900 dark:text-white flex items-center">
+                    {p.name}
+                    {i < item.products.length - 1 && <span className="text-gray-400 mx-2 font-normal">vs</span>}
+                  </span>
+                ))}
               </td>
               <td className="px-4 py-3">
                 <Badge variant="outline" className="gap-1">

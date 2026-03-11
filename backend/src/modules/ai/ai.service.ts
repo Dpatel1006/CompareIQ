@@ -2,42 +2,33 @@ import {
   Injectable,
   Logger,
   InternalServerErrorException,
+  Inject,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
+import * as crypto from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { buildComparisonPrompt } from './prompts/comparison.prompt';
 
 interface ComparisonResult {
-  winner: 'productA' | 'productB' | 'tie';
+  winner: string;
   winnerName: string;
   summary: string;
   categories: Array<{
     name: string;
-    productAScore: number;
-    productBScore: number;
-    winner: 'productA' | 'productB' | 'tie';
+    [key: string]: any; // e.g. productAScore, productBScore, etc.
+    winner: string;
     reasoning: string;
   }>;
-  productA: {
+  products: Record<string, {
     name: string;
     price: number | null;
     pros: string[];
     cons: string[];
     rating: number | null;
     keySpecs: Record<string, string>;
-  };
-  productB: {
-    name: string;
-    price: number | null;
-    pros: string[];
-    cons: string[];
-    rating: number | null;
-    keySpecs: Record<string, string>;
-  };
-  bestFor: {
-    productA: string;
-    productB: string;
-  };
+    bestFor: string;
+  }>;
   recommendation: string;
 }
 
@@ -66,7 +57,10 @@ export class AiService {
   // Model priority order: primary + fallbacks
   private readonly modelChain: string[];
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+  ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY') ?? '';
     this.genAI = new GoogleGenerativeAI(apiKey);
 
@@ -86,8 +80,7 @@ export class AiService {
   }
 
   async compareProducts(
-    productAName: string,
-    productBName: string,
+    productNames: string[],
     preferences?: {
       budget?: string;
       priorities?: string[];
@@ -101,9 +94,26 @@ export class AiService {
       );
     }
 
+    // 1. Check Redis Cache
+    const cacheKey = this.generateCacheKey(
+      productNames,
+      preferences,
+    );
+    try {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        this.logger.log(
+          `🚀 Cache hit for comparison: ${productNames.join(' vs ')}`,
+        );
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      this.logger.error('Redis error during cache check', e);
+      // Continue without cache on error
+    }
+
     const prompt = buildComparisonPrompt(
-      productAName,
-      productBName,
+      productNames,
       preferences,
     );
     const maxTokens =
@@ -112,17 +122,18 @@ export class AiService {
       this.configService.get<number>('GEMINI_TEMPERATURE') || 0.7;
 
     let lastError: unknown;
+    let result: ComparisonResult | undefined;
 
     // Try each model in the chain
     for (const modelName of this.modelChain) {
       try {
-        const result = await this.callModel(
+        result = await this.callModel(
           modelName,
           prompt,
           maxTokens,
           temperature,
         );
-        return result;
+        break;
       } catch (error) {
         if (isQuotaError(error)) {
           this.logger.warn(
@@ -143,15 +154,37 @@ export class AiService {
       }
     }
 
-    // All models exhausted
-    this.logger.error(
-      'All Gemini models hit quota. Daily free-tier limit reached.',
-    );
-    const retryMsg = isQuotaError(lastError)
-      ? 'You have exceeded the Gemini free-tier quota for today. Please wait until midnight (Pacific Time) for the quota to reset, or add billing at https://aistudio.google.com'
-      : 'All AI models are currently unavailable. Please try again later.';
+    if (!result) {
+      // All models exhausted
+      this.logger.error(
+        'All Gemini models hit quota. Daily free-tier limit reached.',
+      );
+      const retryMsg = isQuotaError(lastError)
+        ? 'You have exceeded the Gemini free-tier quota for today. Please wait until midnight (Pacific Time) for the quota to reset, or add billing at https://aistudio.google.com'
+        : 'All AI models are currently unavailable. Please try again later.';
 
-    throw new InternalServerErrorException(retryMsg);
+      throw new InternalServerErrorException(retryMsg);
+    }
+
+    // After successful AI call, store in Redis
+    try {
+      const ttl = this.configService.get<number>('REDIS_TTL', 86400);
+      await this.redis.set(cacheKey, JSON.stringify(result), 'EX', ttl);
+      this.logger.log(`💾 Results cached with TTL ${ttl}s`);
+    } catch (e) {
+      this.logger.error('Redis error during cache storage', e);
+    }
+
+    return result;
+  }
+
+  private generateCacheKey(
+    productNames: string[],
+    prefs?: any,
+  ): string {
+    const keyString = `${productNames.map(p => p.toLowerCase()).sort().join('_')}:${JSON.stringify(prefs || {})}`;
+    const hash = crypto.createHash('sha256').update(keyString).digest('hex');
+    return `compare:${hash}`;
   }
 
   // ── Private: call a single model and parse result ──────────────────────────
@@ -219,10 +252,7 @@ export class AiService {
   // ── Private: validate response structure ───────────────────────────────────
 
   private validateResult(result: ComparisonResult): void {
-    if (
-      !result.winner ||
-      !['productA', 'productB', 'tie'].includes(result.winner)
-    ) {
+    if (!result.winner) {
       throw new InternalServerErrorException(
         'Invalid AI response: missing or invalid winner',
       );
@@ -237,29 +267,36 @@ export class AiService {
         'Invalid AI response: missing categories',
       );
     }
+
+    // Dynamically validate categories logic
     for (const cat of result.categories) {
-      if (
-        typeof cat.productAScore !== 'number' ||
-        typeof cat.productBScore !== 'number' ||
-        cat.productAScore < 0 ||
-        cat.productAScore > 10 ||
-        cat.productBScore < 0 ||
-        cat.productBScore > 10
-      ) {
+      const scoreKeys = Object.keys(cat).filter(k => k.endsWith('Score'));
+      if (scoreKeys.length < 2) {
         throw new InternalServerErrorException(
-          `Invalid AI response: invalid scores in category "${cat.name}"`,
+          `Invalid AI response: missing scores in category "${cat.name}"`,
         );
       }
+      for (const key of scoreKeys) {
+        const score = cat[key];
+        if (typeof score !== 'number' || score < 0 || score > 10) {
+          throw new InternalServerErrorException(
+            `Invalid AI response: invalid score for ${key} in category "${cat.name}"`,
+          );
+        }
+      }
     }
-    if (!result.productA?.pros || !result.productB?.pros) {
+
+    if (!result.products || Object.keys(result.products).length < 2) {
       throw new InternalServerErrorException(
-        'Invalid AI response: missing product analysis',
+        'Invalid AI response: missing products analysis',
       );
     }
-    if (!result.bestFor?.productA || !result.bestFor?.productB) {
-      throw new InternalServerErrorException(
-        'Invalid AI response: missing bestFor',
-      );
+    for (const key of Object.keys(result.products)) {
+      if (!result.products[key].pros || !result.products[key].bestFor) {
+        throw new InternalServerErrorException(
+          `Invalid AI response: missing pros or bestFor for product ${key}`,
+        );
+      }
     }
     if (!result.recommendation) {
       throw new InternalServerErrorException(

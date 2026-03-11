@@ -1,16 +1,16 @@
-import { IsString, IsOptional, IsObject, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsArray, ArrayMinSize, ArrayMaxSize } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateComparisonDto {
-  @ApiProperty({ example: 'iPhone 15 Pro' })
-  @IsString()
-  @MinLength(2)
-  productAName: string;
-
-  @ApiProperty({ example: 'Samsung Galaxy S24 Ultra' })
-  @IsString()
-  @MinLength(2)
-  productBName: string;
+  @ApiProperty({
+    example: ['iPhone 15 Pro', 'Samsung Galaxy S24 Ultra'],
+    description: 'List of products to compare (2-4)',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(2)
+  @ArrayMaxSize(4)
+  productNames: string[];
 
   @ApiPropertyOptional({
     example: {

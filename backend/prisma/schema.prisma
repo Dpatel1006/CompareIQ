@@ -10,16 +10,18 @@ datasource db {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String?
-  passwordHash String?
-  googleId     String?      @unique
-  tier         Tier         @default(FREE)
-  preferences  Json?
-  comparisons  Comparison[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id                  String       @id @default(cuid())
+  email               String       @unique
+  name                String?
+  passwordHash        String?
+  googleId            String?      @unique
+  tier                Tier         @default(FREE)
+  preferences         Json?
+  resetPasswordToken  String?      @unique
+  resetPasswordExpiry DateTime?
+  comparisons         Comparison[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 }
 
 model Product {
@@ -34,26 +36,22 @@ model Product {
   reviewCount  Int?
   sourceUrl    String?
   externalId   String?
-  comparisonsA Comparison[] @relation("ProductA")
-  comparisonsB Comparison[] @relation("ProductB")
+  comparisons  Comparison[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
 
 model Comparison {
-  id         String   @id @default(cuid())
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  productAId String
-  productA   Product  @relation("ProductA", fields: [productAId], references: [id])
-  productBId String
-  productB   Product  @relation("ProductB", fields: [productBId], references: [id])
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  products    Product[]
   preferences Json?
-  result     Json
-  winnerId   String
-  isPublic   Boolean  @default(false)
-  shareToken String?  @unique
-  createdAt  DateTime @default(now())
+  result      Json
+  winnerId    String
+  isPublic    Boolean  @default(false)
+  shareToken  String?  @unique
+  createdAt   DateTime @default(now())
 }
 
 enum Tier {

@@ -65,3 +65,21 @@ export const SWAGGER = {
   VERSION: '1.0',
   PATH: 'api/docs',
 } as const;
+
+export const TIER_LIMITS = {
+  FREE: {
+    DAILY_LIMIT: 5,
+    HISTORY_DAYS: 30,
+    FEATURES: ['basic_ai', 'share_links'],
+  },
+  PRO: {
+    DAILY_LIMIT: 100, // Effectively unlimited
+    HISTORY_DAYS: 365,
+    FEATURES: ['pro_ai', 'share_links', 'pdf_export', 'no_ads'],
+  },
+  TEAM: {
+    DAILY_LIMIT: 500,
+    HISTORY_DAYS: 999,
+    FEATURES: ['pro_ai', 'share_links', 'pdf_export', 'no_ads', 'admin_dash'],
+  },
+} as const;

@@ -4,8 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 
 interface CreateComparisonInput {
-  productAName: string;
-  productBName: string;
+  productNames: string[];
   preferences?: {
     budget?: string;
     priorities?: string[];
@@ -27,6 +26,17 @@ export function useComparison(id: string) {
     queryKey: ['comparison', id],
     queryFn: async () => {
       const { data } = await api.get(`/comparisons/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useRelatedComparisons(id: string) {
+  return useQuery({
+    queryKey: ['comparison', id, 'related'],
+    queryFn: async () => {
+      const { data } = await api.get(`/comparisons/${id}/related`);
       return data;
     },
     enabled: !!id,

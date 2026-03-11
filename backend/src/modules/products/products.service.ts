@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as puppeteer from 'puppeteer';
 import { PrismaService } from '../../prisma/prisma.service';
 
 interface SerperProduct {
@@ -19,7 +20,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async search(query: string, category?: string) {
     // First check local database
@@ -122,9 +123,61 @@ export class ProductsService {
           specs: {},
         },
       });
+
+      // Background image fetching if missing
+      if (!product.imageUrl) {
+        this.enrichProductWithImage(product.id, name).catch((err) =>
+          this.logger.error(`Failed to enrich product ${name} with image`, err),
+        );
+      }
+    } else if (!product.imageUrl) {
+      // Also try for existing products missing images
+      this.enrichProductWithImage(product.id, name).catch((err) =>
+        this.logger.error(`Failed to enrich existing product ${name} with image`, err),
+      );
     }
 
     return product.id;
+  }
+
+  private async enrichProductWithImage(id: string, name: string) {
+    this.logger.log(`Enriching product ${name} with image...`);
+    const imageUrl = await this.scrapeImage(name);
+    if (imageUrl) {
+      await this.prisma.product.update({
+        where: { id },
+        data: { imageUrl },
+      });
+      this.logger.log(`Successfully added image for ${name}`);
+    }
+  }
+
+  private async scrapeImage(name: string): Promise<string | null> {
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      const page = await browser.newPage();
+
+      // Use Bing Images for easier scraping
+      const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(name + ' product official')}`;
+      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      const imageUrl = await page.evaluate(() => {
+        // Bing Images selector for the first result thumbnail/image
+        const img = document.querySelector('.iusc img, .mimg') as HTMLImageElement;
+        return img ? img.src : null;
+      });
+
+      return imageUrl;
+    } catch (e) {
+      this.logger.warn(`Image scraping failed for ${name}: ${e.message}`);
+      return null;
+    } finally {
+      if (browser) await browser.close();
+    }
   }
 
   private async searchSerper(

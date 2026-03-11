@@ -10,7 +10,7 @@ interface ProductCardProps {
   pros: string[];
   cons: string[];
   isWinner: boolean;
-  accentColor: 'indigo' | 'violet';
+  accentColor: 'indigo' | 'violet' | 'purple' | 'fuchsia';
 }
 
 export function ProductCard({
@@ -28,12 +28,28 @@ export function ProductCard({
       border: 'border-indigo-200 dark:border-indigo-800',
       text: 'text-indigo-600 dark:text-indigo-400',
       badge: 'bg-indigo-600',
+      ring: 'ring-indigo-500',
     },
     violet: {
       bg: 'bg-violet-50 dark:bg-violet-950/30',
       border: 'border-violet-200 dark:border-violet-800',
       text: 'text-violet-600 dark:text-violet-400',
       badge: 'bg-violet-600',
+      ring: 'ring-violet-500',
+    },
+    purple: {
+      bg: 'bg-purple-50 dark:bg-purple-950/30',
+      border: 'border-purple-200 dark:border-purple-800',
+      text: 'text-purple-600 dark:text-purple-400',
+      badge: 'bg-purple-600',
+      ring: 'ring-purple-500',
+    },
+    fuchsia: {
+      bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/30',
+      border: 'border-fuchsia-200 dark:border-fuchsia-800',
+      text: 'text-fuchsia-600 dark:text-fuchsia-400',
+      badge: 'bg-fuchsia-600',
+      ring: 'ring-fuchsia-500',
     },
   };
 
@@ -43,7 +59,7 @@ export function ProductCard({
     <div
       className={cn(
         'rounded-xl border p-6 space-y-4 transition-all',
-        isWinner ? `${c.bg} ${c.border} ring-2 ring-offset-2 ring-${accentColor === 'indigo' ? 'indigo' : 'violet'}-500` : 'bg-white dark:bg-gray-900',
+        isWinner ? `${c.bg} ${c.border} ring-2 ring-offset-2 ${c.ring}` : 'bg-white dark:bg-gray-900',
       )}
     >
       <div className="flex items-start justify-between">

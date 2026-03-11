@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Check, X, Sparkles, Zap, Building2, Globe, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import api from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 // ── Real pricing in INR (Indian base prices) ──────────────────────────────────
 // These are real, market-competitive SaaS prices for India
@@ -135,12 +138,17 @@ function PlanCard({
   currency,
   yearly,
   index,
+  onUpgrade,
+  isUpgrading,
 }: {
-  plan: typeof PLANS_INR[0];
+  plan: (typeof PLANS_INR)[0];
   currency: typeof CURRENCIES['IN'];
   yearly: boolean;
   index: number;
+  onUpgrade?: (tier: string) => void;
+  isUpgrading?: string | null;
 }) {
+  const { user } = useAuth();
   const Icon = plan.icon;
   const priceINR = yearly ? plan.yearlyINR : plan.monthlyINR;
   const monthlyEquivINR = yearly && plan.yearlyINR > 0
@@ -269,7 +277,7 @@ function PlanCard({
 
         {/* Features */}
         <ul style={{ flex: 1, marginBottom: '1.75rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {plan.features.map((f) => (
+          {plan.features.map((f: { name: string; included: boolean }) => (
             <li key={f.name} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.875rem' }}>
               {f.included ? (
                 <div style={{
@@ -296,43 +304,58 @@ function PlanCard({
         </ul>
 
         {/* CTA */}
-        <Link
-          href={plan.href}
-          style={{
-            display: 'block',
-            textAlign: 'center',
-            padding: '12px 24px',
-            borderRadius: '12px',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            textDecoration: 'none',
-            transition: 'all 0.2s ease',
-            background: plan.popular ? plan.gradient : 'transparent',
-            color: plan.popular ? 'white' : '#6366f1',
-            border: plan.popular ? 'none' : '2px solid #6366f1',
-            boxShadow: plan.popular ? '0 4px 15px rgba(99,102,241,0.35)' : 'none',
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget as HTMLAnchorElement;
-            if (plan.popular) {
-              el.style.boxShadow = '0 8px 25px rgba(99,102,241,0.5)';
-              el.style.transform = 'translateY(-1px)';
-            } else {
-              el.style.background = 'rgba(99,102,241,0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget as HTMLAnchorElement;
-            el.style.transform = 'translateY(0)';
-            if (plan.popular) {
-              el.style.boxShadow = '0 4px 15px rgba(99,102,241,0.35)';
-            } else {
-              el.style.background = 'transparent';
-            }
-          }}
-        >
-          {plan.cta}
-        </Link>
+        {plan.name === 'Free' ? (
+          <Link
+            href={user ? '/dashboard' : '/register'}
+            style={{
+              display: 'block',
+              textAlign: 'center',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              textDecoration: 'none',
+              transition: 'all 0.2s ease',
+              background: 'transparent',
+              color: '#6366f1',
+              border: '2px solid #6366f1',
+            }}
+          >
+            {user ? 'Go to Dashboard' : plan.cta}
+          </Link>
+        ) : (
+          <button
+            onClick={() => onUpgrade?.(plan.name === 'Business' ? 'TEAM' : 'PRO')}
+            disabled={!!isUpgrading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              transition: 'all 0.2s ease',
+              background: plan.popular ? plan.gradient : 'transparent',
+              color: plan.popular ? 'white' : '#6366f1',
+              border: plan.popular ? 'none' : '2px solid #6366f1',
+              cursor: isUpgrading ? 'not-allowed' : 'pointer',
+              opacity: isUpgrading ? 0.7 : 1,
+              boxShadow: plan.popular ? '0 4px 15px rgba(99,102,241,0.35)' : 'none',
+            }}
+          >
+            {isUpgrading === (plan.name === 'Business' ? 'TEAM' : 'PRO') ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            {isUpgrading === (plan.name === 'Business' ? 'TEAM' : 'PRO')
+              ? 'Processing...'
+              : user
+                ? plan.cta
+                : 'Sign in to Upgrade'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -340,10 +363,32 @@ function PlanCard({
 
 // ── Main Pricing Page ─────────────────────────────────────────────────────────
 export default function PricingPage() {
+  const { user } = useAuth();
   const [yearly, setYearly] = useState(false);
   const [countryCode, setCountryCode] = useState<string>('IN');
   const [detecting, setDetecting] = useState(true);
   const [currency, setCurrency] = useState(CURRENCIES['IN']);
+  const [isUpgrading, setIsUpgrading] = useState<string | null>(null);
+
+  const handleUpgrade = async (tier: string) => {
+    if (!user) {
+      window.location.href = `/login?redirect=/pricing`;
+      return;
+    }
+
+    setIsUpgrading(tier);
+    try {
+      const { data } = await api.post('/billing/checkout', { tier });
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      console.error('Upgrade error:', error);
+      toast.error(error.response?.data?.message || 'Failed to start checkout. Please try again.');
+    } finally {
+      setIsUpgrading(null);
+    }
+  };
 
   // Detect user country from IP
   useEffect(() => {
@@ -478,7 +523,15 @@ export default function PricingPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
             {PLANS_INR.map((plan, i) => (
-              <PlanCard key={plan.name} plan={plan} currency={currency} yearly={yearly} index={i} />
+              <PlanCard
+                key={plan.name}
+                plan={plan}
+                currency={currency}
+                yearly={yearly}
+                index={i}
+                onUpgrade={handleUpgrade}
+                isUpgrading={isUpgrading}
+              />
             ))}
           </div>
         )}

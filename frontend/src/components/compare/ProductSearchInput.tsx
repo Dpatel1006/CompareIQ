@@ -34,7 +34,7 @@ interface ProductSearchInputProps {
   onChange: (value: string) => void;
   onSelect: (product: { name: string; id?: string; brand?: string; category?: string; price?: number; imageUrl?: string }) => void;
   onClear: () => void;
-  accentColor: 'indigo' | 'violet';
+  accentColor: 'indigo' | 'violet' | 'purple' | 'fuchsia';
 }
 
 export function ProductSearchInput({
@@ -130,9 +130,32 @@ export function ProductSearchInput({
     setIsOpen(false);
   };
 
-  const ringColors = accentColor === 'indigo' ? 'focus-within:ring-indigo-500/30' : 'focus-within:ring-violet-500/30';
-  const borderColors = accentColor === 'indigo' ? 'focus-within:border-indigo-500' : 'focus-within:border-violet-500';
-  const iconColors = accentColor === 'indigo' ? 'text-indigo-500' : 'text-violet-500';
+  const colorMap = {
+    indigo: {
+      ring: 'focus-within:ring-indigo-500/30',
+      border: 'focus-within:border-indigo-500',
+      icon: 'text-indigo-500',
+    },
+    violet: {
+      ring: 'focus-within:ring-violet-500/30',
+      border: 'focus-within:border-violet-500',
+      icon: 'text-violet-500',
+    },
+    purple: {
+      ring: 'focus-within:ring-purple-500/30',
+      border: 'focus-within:border-purple-500',
+      icon: 'text-purple-500',
+    },
+    fuchsia: {
+      ring: 'focus-within:ring-fuchsia-500/30',
+      border: 'focus-within:border-fuchsia-500',
+      icon: 'text-fuchsia-500',
+    },
+  };
+
+  const ringColors = colorMap[accentColor].ring;
+  const borderColors = colorMap[accentColor].border;
+  const iconColors = colorMap[accentColor].icon;
 
   return (
     <div ref={containerRef} className="relative group">

@@ -9,8 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp, Sparkles, SlidersHorizontal } from 'lucide-react';
 
 interface PreferencesPanelProps {
-  productAName: string;
-  productBName: string;
+  productNames: string[];
   preferences: {
     budget?: string;
     priorities?: string[];
@@ -151,28 +150,33 @@ function detectCategory(name: string): string {
 }
 
 export function PreferencesPanel({
-  productAName,
-  productBName,
+  productNames,
   preferences,
   onChange,
 }: PreferencesPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [detectedCategory, setDetectedCategory] = useState('general');
 
-  const bothFilled = productAName.trim().length > 1 && productBName.trim().length > 1;
+  const filledProductsCount = productNames.filter(n => n.trim().length > 1).length;
+  const allFilled = filledProductsCount >= 2;
 
   // Detect category whenever product names change
   useEffect(() => {
-    const catA = detectCategory(productAName);
-    const catB = detectCategory(productBName);
-    const cat = catA !== 'general' ? catA : catB !== 'general' ? catB : 'general';
+    let cat = 'general';
+    for (const name of productNames) {
+      const currentCat = detectCategory(name);
+      if (currentCat !== 'general') {
+        cat = currentCat;
+        break;
+      }
+    }
     if (cat !== detectedCategory) {
       setDetectedCategory(cat);
       // Clear priorities when category changes
       onChange({ ...preferences, priorities: [] });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productAName, productBName]);
+  }, [productNames]);
 
   const priorityOptions = CATEGORY_PRIORITIES[detectedCategory] || CATEGORY_PRIORITIES.general;
 
@@ -184,19 +188,19 @@ export function PreferencesPanel({
     onChange({ ...preferences, priorities: updated });
   };
 
-  // Auto-open when both products are filled
+  // Auto-open when enough products are filled
   useEffect(() => {
-    if (bothFilled && !isOpen) {
+    if (allFilled && !isOpen) {
       setIsOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bothFilled]);
+  }, [allFilled]);
 
-  if (!bothFilled) {
+  if (!allFilled) {
     return (
       <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-4 text-center text-sm text-gray-400 dark:text-gray-500">
         <SlidersHorizontal className="h-5 w-5 mx-auto mb-2 opacity-50" />
-        Fill in both products above to unlock smart preferences
+        Fill in at least two products above to unlock smart preferences
       </div>
     );
   }

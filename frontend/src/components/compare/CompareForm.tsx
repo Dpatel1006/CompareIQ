@@ -7,49 +7,50 @@ import { PreferencesPanel } from './PreferencesPanel';
 import { CompareButton } from './CompareButton';
 import { useCompareStore } from '@/store/compareStore';
 import { useCreateComparison } from '@/hooks/useComparison';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { CompareLoading } from './CompareLoading';
+import { Button } from '../ui/button';
 
 export function CompareForm() {
   const router = useRouter();
   const {
-    productA,
-    productB,
+    products,
     preferences,
-    setProductA,
-    setProductB,
+    setProduct,
+    addProduct,
+    removeProduct,
     setPreferences,
   } = useCompareStore();
 
-  const [productAName, setProductAName] = useState(productA?.name || '');
-  const [productBName, setProductBName] = useState(productB?.name || '');
+  const [productNames, setProductNames] = useState<string[]>(
+    products.map((p) => p?.name || '')
+  );
   const [error, setError] = useState<string | null>(null);
 
   const createComparison = useCreateComparison();
 
   const handleCompare = async () => {
-    const nameA = productAName.trim();
-    const nameB = productBName.trim();
+    const trimmedNames = productNames.map(n => n.trim()).filter(Boolean);
 
-    if (!nameA || !nameB) {
-      setError('Please enter both products to compare.');
+    if (trimmedNames.length < 2) {
+      setError('Please enter at least two products to compare.');
       return;
     }
 
-    if (nameA.toLowerCase() === nameB.toLowerCase()) {
-      setError('Please enter two different products.');
+    const uniqueNames = new Set(trimmedNames.map(n => n.toLowerCase()));
+    if (uniqueNames.size !== trimmedNames.length) {
+      setError('Please enter unique products.');
       return;
     }
 
     setError(null);
 
     try {
-      const result = await createComparison.mutateAsync({
-        productAName: nameA,
-        productBName: nameB,
+      const { id } = await createComparison.mutateAsync({
+        productNames: trimmedNames,
         preferences: Object.keys(preferences).length > 0 ? preferences : undefined,
       });
-      router.push(`/compare/${result.id}`);
+      router.push(`/compare/${id}`);
     } catch (err: unknown) {
       const rawMessage =
         err && typeof err === 'object' && 'response' in err
@@ -66,6 +67,12 @@ export function CompareForm() {
     }
   };
 
+  const handleNameChange = (index: number, name: string) => {
+    const newNames = [...productNames];
+    newNames[index] = name;
+    setProductNames(newNames);
+  };
+
   if (createComparison.isPending) {
     return <CompareLoading />;
   }
@@ -79,33 +86,57 @@ export function CompareForm() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
-        <ProductSearchInput
-          label="Product A"
-          value={productAName}
-          onChange={setProductAName}
-          onSelect={(p) => setProductA(p)}
-          onClear={() => setProductA(null)}
-          accentColor="indigo"
-        />
+      <div className="space-y-4">
+        {productNames.map((name, index) => (
+          <div key={index} className="relative flex items-end gap-2">
+            <div className="flex-1">
+              <ProductSearchInput
+                label={`Product ${String.fromCharCode(65 + index)}`}
+                value={name}
+                onChange={(val) => handleNameChange(index, val)}
+                onSelect={(p) => setProduct(index, p)}
+                onClear={() => setProduct(index, null)}
+                accentColor={index === 0 ? 'indigo' : index === 1 ? 'violet' : index === 2 ? 'purple' : 'fuchsia'}
+              />
+            </div>
+            {productNames.length > 2 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  removeProduct(index);
+                  const newNames = [...productNames];
+                  newNames.splice(index, 1);
+                  setProductNames(newNames);
+                }}
+                className="mb-0.5 text-muted-foreground hover:text-red-500"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ))}
 
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 font-bold text-sm mx-auto mb-0.5 shrink-0 border border-indigo-200 dark:border-indigo-800">
-          VS
-        </div>
-
-        <ProductSearchInput
-          label="Product B"
-          value={productBName}
-          onChange={setProductBName}
-          onSelect={(p) => setProductB(p)}
-          onClear={() => setProductB(null)}
-          accentColor="violet"
-        />
+        {productNames.length < 4 && (
+          <div className="flex justify-start">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                addProduct();
+                setProductNames([...productNames, '']);
+              }}
+              className="gap-2 text-xs h-8 px-3 rounded-full border-dashed"
+            >
+              <Plus className="h-3 w-3" />
+              Add Product
+            </Button>
+          </div>
+        )}
       </div>
 
       <PreferencesPanel
-        productAName={productAName}
-        productBName={productBName}
+        productNames={productNames}
         preferences={preferences}
         onChange={setPreferences}
       />
@@ -114,7 +145,7 @@ export function CompareForm() {
         <CompareButton
           onClick={handleCompare}
           isLoading={false}
-          disabled={!productAName.trim() || !productBName.trim()}
+          disabled={productNames.filter(n => n.trim()).length < 2}
         />
       </div>
     </div>
