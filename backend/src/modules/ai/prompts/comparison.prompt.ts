@@ -334,8 +334,7 @@ export function buildComparisonPrompt(
   // Detect category using all product names
   const categories = productNames.map(detectProductCategory);
   // Use the most specific category
-  const category =
-    categories.find((c) => c !== 'general') || 'general';
+  const category = categories.find((c) => c !== 'general') || 'general';
   const axes = CATEGORY_AXES[category];
 
   let preferencesSection = '';
@@ -356,7 +355,9 @@ export function buildComparisonPrompt(
     .map((name, i) => `Product ${String.fromCharCode(65 + i)}: ${name}`)
     .join('\n');
 
-  const idList = productNames.map((_, i) => `product${String.fromCharCode(65 + i)}`);
+  const idList = productNames.map(
+    (_, i) => `product${String.fromCharCode(65 + i)}`,
+  );
 
   return `You are an expert product comparison analyst specializing in ${category} products.
 
@@ -385,13 +386,15 @@ You MUST respond with valid JSON matching this exact structure:
   "categories": [
     {
       "name": "string",
-      ${idList.map(id => `"${id}Score": number`).join(',\n      ')},
+      ${idList.map((id) => `"${id}Score": number`).join(',\n      ')},
       "winner": "${idList.join(' | ')} | tie",
       "reasoning": "string"
     }
   ],
   "products": {
-    ${idList.map(id => `"${id}": {
+    ${idList
+      .map(
+        (id) => `"${id}": {
       "name": "string",
       "price": number | null,
       "pros": ["string"],
@@ -399,7 +402,9 @@ You MUST respond with valid JSON matching this exact structure:
       "rating": number | null,
       "keySpecs": { "key": "value" },
       "bestFor": "string"
-    }`).join(',\n    ')}
+    }`,
+      )
+      .join(',\n    ')}
   },
   "recommendation": "string"
 }

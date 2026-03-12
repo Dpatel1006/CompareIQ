@@ -18,16 +18,16 @@ export class ComparisonsService {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly productsService: ProductsService,
-  ) { }
+  ) {}
 
   async create(dto: CreateComparisonDto, userId?: string) {
-    this.logger.log(
-      `Creating comparison for: ${dto.productNames.join(', ')}`,
-    );
+    this.logger.log(`Creating comparison for: ${dto.productNames.join(', ')}`);
 
     // 1. Find or create products
     const productIds = await Promise.all(
-      dto.productNames.map((name) => this.productsService.findOrCreateByName(name)),
+      dto.productNames.map((name) =>
+        this.productsService.findOrCreateByName(name),
+      ),
     );
 
     // 2. Call AI for comparison
@@ -204,7 +204,7 @@ export class ComparisonsService {
     if (!comparison) return [];
 
     const category = (comparison.result as any)?.category || 'general';
-    const productIds = comparison.products.map(p => p.id);
+    const productIds = comparison.products.map((p) => p.id);
 
     const related = await this.prisma.comparison.findMany({
       where: {

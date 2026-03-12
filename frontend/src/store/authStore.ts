@@ -9,6 +9,7 @@ interface User {
   email: string;
   name: string | null;
   tier: string;
+  role?: string;
   preferences: Record<string, unknown> | null;
 }
 

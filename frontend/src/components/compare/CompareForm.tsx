@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ProductSearchInput } from './ProductSearchInput';
 import { PreferencesPanel } from './PreferencesPanel';
 import { CompareButton } from './CompareButton';
@@ -22,9 +22,23 @@ export function CompareForm() {
     setPreferences,
   } = useCompareStore();
 
-  const [productNames, setProductNames] = useState<string[]>(
-    products.map((p) => p?.name || '')
-  );
+  const searchParams = useSearchParams();
+
+  const [productNames, setProductNames] = useState<string[]>(() => {
+    const defaultNames = products.map((p) => p?.name || '');
+    const a = searchParams.get('a');
+    const b = searchParams.get('b');
+    
+    if (a && b) {
+      // Sync with store if search params are provided upon load
+      if (defaultNames[0] !== a || defaultNames[1] !== b) {
+        setProduct(0, { name: a });
+        setProduct(1, { name: b });
+      }
+      return [a, b];
+    }
+    return defaultNames;
+  });
   const [error, setError] = useState<string | null>(null);
 
   const createComparison = useCreateComparison();

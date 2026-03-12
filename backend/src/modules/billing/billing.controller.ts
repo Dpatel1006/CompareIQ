@@ -1,10 +1,10 @@
 import {
-    Controller,
-    Post,
-    Body,
-    Req,
-    HttpCode,
-    HttpStatus,
+  Controller,
+  Post,
+  Body,
+  Req,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -16,23 +16,23 @@ import { Public } from '../../common/decorators/public.decorator';
 @ApiTags('Billing')
 @Controller('billing')
 export class BillingController {
-    constructor(private readonly billingService: BillingService) { }
+  constructor(private readonly billingService: BillingService) {}
 
-    @Post('checkout')
-    @ApiBearerAuth()
-    @ApiOperation({ summary: 'Create a Stripe checkout session' })
-    async createCheckout(
-        @CurrentUser('id') userId: string,
-        @Body('tier') tier: 'PRO' | 'TEAM',
-    ) {
-        return this.billingService.createCheckoutSession(userId, tier);
-    }
+  @Post('checkout')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a Stripe checkout session' })
+  async createCheckout(
+    @CurrentUser('id') userId: string,
+    @Body('tier') tier: 'PRO' | 'TEAM',
+  ) {
+    return this.billingService.createCheckoutSession(userId, tier);
+  }
 
-    @Public()
-    @Post('webhook')
-    @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Stripe webhook handler' })
-    async webhook(@Req() req: RawBodyRequest<Request>) {
-        return this.billingService.handleWebhook(req);
-    }
+  @Public()
+  @Post('webhook')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Stripe webhook handler' })
+  async webhook(@Req() req: RawBodyRequest<Request>) {
+    return this.billingService.handleWebhook(req);
+  }
 }

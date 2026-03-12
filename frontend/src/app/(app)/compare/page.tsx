@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { CompareForm } from '@/components/compare/CompareForm';
 import { Sparkles, ArrowRight, Zap, Shield, BarChart3 } from 'lucide-react';
 
@@ -32,7 +33,9 @@ export default function ComparePage() {
       </div>
 
       <div className="rounded-2xl border bg-white dark:bg-gray-900 shadow-sm p-6 sm:p-8">
-        <CompareForm />
+        <Suspense fallback={<div className="h-64 flex items-center justify-center">Loading form...</div>}>
+          <CompareForm />
+        </Suspense>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -59,8 +62,9 @@ export default function ComparePage() {
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {popularComparisons.map((comp, i) => (
-            <button
+            <Link
               key={i}
+              href={`/compare?a=${encodeURIComponent(comp.a)}&b=${encodeURIComponent(comp.b)}`}
               className="flex items-center justify-between px-5 py-3.5 rounded-xl border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-sm group"
             >
               <div className="flex items-center gap-2">
@@ -69,7 +73,7 @@ export default function ComparePage() {
                 <span className="font-semibold text-gray-700 dark:text-gray-300">{comp.b}</span>
               </div>
               <ArrowRight className="h-4 w-4 text-gray-300 group-hover:text-indigo-600 transition-colors" />
-            </button>
+            </Link>
           ))}
         </div>
       </div>

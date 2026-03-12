@@ -16,6 +16,7 @@ model User {
   passwordHash        String?
   googleId            String?      @unique
   tier                Tier         @default(FREE)
+  role                Role         @default(USER)
   preferences         Json?
   resetPasswordToken  String?      @unique
   resetPasswordExpiry DateTime?
@@ -58,4 +59,9 @@ enum Tier {
   FREE
   PRO
   TEAM
+}
+
+enum Role {
+  USER
+  ADMIN
 }

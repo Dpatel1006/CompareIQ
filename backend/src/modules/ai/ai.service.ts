@@ -20,15 +20,18 @@ interface ComparisonResult {
     winner: string;
     reasoning: string;
   }>;
-  products: Record<string, {
-    name: string;
-    price: number | null;
-    pros: string[];
-    cons: string[];
-    rating: number | null;
-    keySpecs: Record<string, string>;
-    bestFor: string;
-  }>;
+  products: Record<
+    string,
+    {
+      name: string;
+      price: number | null;
+      pros: string[];
+      cons: string[];
+      rating: number | null;
+      keySpecs: Record<string, string>;
+      bestFor: string;
+    }
+  >;
   recommendation: string;
 }
 
@@ -95,31 +98,27 @@ export class AiService {
     }
 
     // 1. Check Redis Cache
-    const cacheKey = this.generateCacheKey(
-      productNames,
-      preferences,
-    );
-    try {
-      const cached = await this.redis.get(cacheKey);
-      if (cached) {
-        this.logger.log(
-          `🚀 Cache hit for comparison: ${productNames.join(' vs ')}`,
-        );
-        return JSON.parse(cached);
+    const cacheKey = this.generateCacheKey(productNames, preferences);
+    if (this.redis.status === 'ready') {
+      try {
+        const cached = await this.redis.get(cacheKey);
+        if (cached) {
+          this.logger.log(
+            `🚀 Cache hit for comparison: ${productNames.join(' vs ')}`,
+          );
+          return JSON.parse(cached);
+        }
+      } catch (e) {
+        this.logger.error('Redis error during cache check', e);
+        // Continue without cache on error
       }
-    } catch (e) {
-      this.logger.error('Redis error during cache check', e);
-      // Continue without cache on error
     }
 
-    const prompt = buildComparisonPrompt(
-      productNames,
-      preferences,
-    );
+    const prompt = buildComparisonPrompt(productNames, preferences);
     const maxTokens =
       this.configService.get<number>('GEMINI_MAX_TOKENS') || 4000;
     const temperature =
-      this.configService.get<number>('GEMINI_TEMPERATURE') || 0.7;
+      this.configService.get<number>('GEMINI_TEMPERATURE') || 0.4;
 
     let lastError: unknown;
     let result: ComparisonResult | undefined;
@@ -167,22 +166,24 @@ export class AiService {
     }
 
     // After successful AI call, store in Redis
-    try {
-      const ttl = this.configService.get<number>('REDIS_TTL', 86400);
-      await this.redis.set(cacheKey, JSON.stringify(result), 'EX', ttl);
-      this.logger.log(`💾 Results cached with TTL ${ttl}s`);
-    } catch (e) {
-      this.logger.error('Redis error during cache storage', e);
+    if (this.redis.status === 'ready') {
+      try {
+        const ttl = this.configService.get<number>('REDIS_TTL', 86400);
+        await this.redis.set(cacheKey, JSON.stringify(result), 'EX', ttl);
+        this.logger.log(`💾 Results cached with TTL ${ttl}s`);
+      } catch (e) {
+        this.logger.error('Redis error during cache storage', e);
+      }
     }
 
     return result;
   }
 
-  private generateCacheKey(
-    productNames: string[],
-    prefs?: any,
-  ): string {
-    const keyString = `${productNames.map(p => p.toLowerCase()).sort().join('_')}:${JSON.stringify(prefs || {})}`;
+  private generateCacheKey(productNames: string[], prefs?: any): string {
+    const keyString = `${productNames
+      .map((p) => p.toLowerCase())
+      .sort()
+      .join('_')}:${JSON.stringify(prefs || {})}`;
     const hash = crypto.createHash('sha256').update(keyString).digest('hex');
     return `compare:${hash}`;
   }
@@ -205,7 +206,7 @@ export class AiService {
         maxOutputTokens: maxTokens,
       },
       systemInstruction:
-        'You are a product comparison expert. Always respond with valid JSON only. No markdown formatting.',
+        'You are a precise product comparison expert. You MUST respond with valid, parseable JSON ONLY. Do not include any text before or after the JSON block. Do not use markdown formatting. Ensure all strings are properly escaped and there are no trailing commas.',
     });
 
     const response = await genModel.generateContent(prompt);
@@ -217,11 +218,13 @@ export class AiService {
 
     this.logger.debug(`Raw AI content length: ${content.length}`);
 
-    // Robust JSON extraction using regex (matches the first { and last } pair)
-    let jsonString = content;
-    const jsonMatch = content.match(/(\{[\s\S]*\})/);
-    if (jsonMatch) {
-      jsonString = jsonMatch[1];
+    // 1. Aggressive JSON extraction: find the outermost { } block
+    let jsonString = '';
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonString = content.substring(firstBrace, lastBrace + 1);
     } else {
       // Fallback: strip common markdown fences
       jsonString = content
@@ -230,16 +233,28 @@ export class AiService {
         .trim();
     }
 
+    // 2. Multi-step Sanitize
+    jsonString = this.sanitizeJson(jsonString);
+
     let result: ComparisonResult;
     try {
       result = JSON.parse(jsonString) as ComparisonResult;
-    } catch {
-      this.logger.error(
-        `Invalid JSON from model ${modelName}. Preview: ${jsonString.slice(0, 200)}...`,
-      );
-      throw new InternalServerErrorException(
-        'AI returned invalid JSON. Please try again.',
-      );
+    } catch (err: any) {
+      // 3. Last resort: Try one more aggressive cleanup if simple parsing fails
+      try {
+        this.logger.warn('First JSON parse failed, trying aggressive repair...');
+        const repairedJson = this.aggressiveJsonRepair(jsonString);
+        result = JSON.parse(repairedJson) as ComparisonResult;
+      } catch (repairErr: any) {
+        this.logger.error(
+          `AI JSON Parse Failed. Model: ${modelName}. Error: ${err.message}. Position: ${err.message.match(/position (\d+)/)?.[1] || 'unknown'}`,
+        );
+        this.logger.debug(`Failed JSON Content: ${jsonString}`);
+
+        throw new InternalServerErrorException(
+          'The AI returned a malformed response. Please try one more time.',
+        );
+      }
     }
 
     this.validateResult(result);
@@ -247,6 +262,42 @@ export class AiService {
       `✅ Comparison complete via ${modelName}. Winner: ${result.winner}`,
     );
     return result;
+  }
+
+  /**
+   * Cleans common LLM JSON errors like trailing commas or unescaped newlines.
+   */
+  private sanitizeJson(json: string): string {
+    return (
+      json
+        // Remove potential markdown fences that might have leaked
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        // Remove trailing commas before closing braces/brackets
+        .replace(/,\s*([\]}])/g, '$1')
+        .trim()
+    );
+  }
+
+  /**
+   * Handles more complex issues like unescaped quotes inside strings or literal newlines in strings.
+   */
+  private aggressiveJsonRepair(json: string): string {
+    // 1. Remove literal newlines that occur INSIDE strings
+    // This is a common AI error where it doesn't escape a newline.
+    let repaired = json;
+    
+    // Attempt to fix unescaped newlines in values
+    // Matches something like: "key": "value (newline) continued"
+    repaired = repaired.replace(/: "([^"]*?)\n([^"]*?)"/g, ': "$1\\n$2"');
+
+    // 2. Remove trailing commas (again)
+    repaired = repaired.replace(/,\s*([\]}])/g, '$1');
+    
+    // 3. Fix double commas
+    repaired = repaired.replace(/,,/g, ',');
+
+    return repaired;
   }
 
   // ── Private: validate response structure ───────────────────────────────────
@@ -270,7 +321,7 @@ export class AiService {
 
     // Dynamically validate categories logic
     for (const cat of result.categories) {
-      const scoreKeys = Object.keys(cat).filter(k => k.endsWith('Score'));
+      const scoreKeys = Object.keys(cat).filter((k) => k.endsWith('Score'));
       if (scoreKeys.length < 2) {
         throw new InternalServerErrorException(
           `Invalid AI response: missing scores in category "${cat.name}"`,

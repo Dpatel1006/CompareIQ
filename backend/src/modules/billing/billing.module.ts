@@ -3,7 +3,7 @@ import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 
 @Module({
-    controllers: [BillingController],
-    providers: [BillingService],
+  controllers: [BillingController],
+  providers: [BillingService],
 })
-export class BillingModule { }
+export class BillingModule {}

@@ -19,7 +19,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   async register(dto: RegisterDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -32,20 +32,27 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const user = await this.prisma.user.create({
+    const user = (await this.prisma.user.create({
       data: {
         name: dto.name,
         email: dto.email,
         passwordHash,
       },
-    });
+    })) as any;
 
     // Send welcome email
-    this.mailService.sendWelcomeEmail(user.email, user.name || 'User').catch((err) => {
-      console.error('Failed to send welcome email', err);
-    });
+    this.mailService
+      .sendWelcomeEmail(user.email, user.name || 'User')
+      .catch((err) => {
+        console.error('Failed to send welcome email', err);
+      });
 
-    const tokens = await this.generateTokens(user.id, user.email, user.tier);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.tier,
+      user.role,
+    );
 
     return {
       ...tokens,
@@ -54,6 +61,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         tier: user.tier,
+        role: user.role,
         preferences: user.preferences,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
@@ -62,9 +70,9 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
+    const user = (await this.prisma.user.findUnique({
       where: { email: dto.email },
-    });
+    })) as any;
 
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid email or password');
@@ -79,7 +87,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.tier);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.tier,
+      user.role,
+    );
 
     return {
       ...tokens,
@@ -88,6 +101,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         tier: user.tier,
+        role: user.role,
         preferences: user.preferences,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
@@ -101,15 +115,15 @@ export class AuthService {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
-      const user = await this.prisma.user.findUnique({
+      const user = (await this.prisma.user.findUnique({
         where: { id: payload.sub },
-      });
+      })) as any;
 
       if (!user) {
         throw new UnauthorizedException('User not found');
       }
 
-      return this.generateTokens(user.id, user.email, user.tier);
+      return this.generateTokens(user.id, user.email, user.tier, user.role);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -120,9 +134,9 @@ export class AuthService {
     email: string;
     name: string;
   }) {
-    let user = await this.prisma.user.findUnique({
+    let user = (await this.prisma.user.findUnique({
       where: { googleId: googleUser.googleId },
-    });
+    })) as any;
 
     if (!user) {
       user = await this.prisma.user.findUnique({
@@ -145,7 +159,12 @@ export class AuthService {
       }
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.tier);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.tier,
+      user.role,
+    );
 
     return {
       ...tokens,
@@ -154,6 +173,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         tier: user.tier,
+        role: user.role,
         preferences: user.preferences,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
@@ -161,8 +181,13 @@ export class AuthService {
     };
   }
 
-  private async generateTokens(userId: string, email: string, tier: string) {
-    const payload = { sub: userId, email, tier };
+  private async generateTokens(
+    userId: string,
+    email: string,
+    tier: string,
+    role: string = 'USER',
+  ) {
+    const payload = { sub: userId, email, tier, role };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {

@@ -21,6 +21,7 @@ export interface User {
   email: string;
   name: string | null;
   tier: Tier;
+  role?: string;
   preferences: UserPreferences | null;
   createdAt: string;
   updatedAt: string;

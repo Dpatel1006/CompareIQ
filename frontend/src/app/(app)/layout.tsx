@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
-import { Sidebar } from '@/components/layout/Sidebar';
 import { useAuthStore } from '@/store/authStore';
 import { PageLoader } from '@/components/ui/PageLoader';
 
@@ -43,10 +42,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Navbar />
       </div>
 
-      {/* ── Body row: sidebar + main — positioned below fixed header ── */}
+      {/* ── Body column: main — positioned below fixed header ── */}
       <div
         style={{
           display: 'flex',
+          flexDirection: 'column',
           position: 'fixed',
           top: `${HEADER_HEIGHT}px`,
           left: 0,
@@ -54,9 +54,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           bottom: 0,
         }}
       >
-        {/* ── Sidebar — fixed height, its own scroll if content overflows ── */}
-        <Sidebar />
-
         {/* ── Main content — only this scrolls ── */}
         <main
           key={pageKey}
@@ -64,11 +61,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            padding: '2rem 2.5rem',
+            padding: '1.5rem 1rem',
             animation: 'fadeInUp 0.35s cubic-bezier(0,0,0.2,1) both',
           }}
         >
-          <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '1440px', margin: '0 auto' }}>
             {children}
           </div>
         </main>

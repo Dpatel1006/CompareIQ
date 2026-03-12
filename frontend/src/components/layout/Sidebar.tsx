@@ -8,24 +8,23 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react';
 import {
   LayoutDashboard, GitCompare, History, Settings,
   CreditCard, LogOut, User, ChevronUp, Zap,
-  PanelLeftClose, PanelLeftOpen, Menu,
+  PanelLeftClose, PanelLeftOpen, Menu, Shield,
 } from 'lucide-react';
 
-// ── Sidebar Context (share collapsed state with Navbar toggle) ────────────────
-const SidebarCtx = createContext<{ collapsed: boolean; toggle: () => void }>({
-  collapsed: false,
-  toggle: () => { },
-});
-export const useSidebar = () => useContext(SidebarCtx);
-
-// ── Nav links ─────────────────────────────────────────────────────────────────
-const NAV_LINKS = [
+// ── Nav links base ────────────────────────────────────────────────────────────
+const BASE_NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/compare', label: 'Compare', icon: GitCompare },
   { href: '/history', label: 'History', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/pricing', label: 'Pricing', icon: CreditCard },
 ];
+// ── Sidebar Context (share collapsed state with Navbar toggle) ────────────────
+const SidebarCtx = createContext<{ collapsed: boolean; toggle: () => void }>({
+  collapsed: false,
+  toggle: () => { },
+});
+export const useSidebar = () => useContext(SidebarCtx);
 
 // ── User Footer with pop-up submenu ──────────────────────────────────────────
 function UserFooter({ collapsed }: { collapsed: boolean }) {
@@ -200,11 +199,17 @@ export function Sidebar() {
   // Close mobile sidebar on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
+  const { user } = useAuth();
+  const navLinks = [...BASE_NAV_LINKS];
+  if (user?.role === 'ADMIN') {
+    navLinks.push({ href: '/admin', label: 'Admin', icon: Shield });
+  }
+
   const NavContent = (
     <>
       {/* ── Nav links ── */}
       <nav style={{ flex: 1, padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        {NAV_LINKS.map((link) => {
+        {navLinks.map((link) => {
           const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
           return (
             <Link

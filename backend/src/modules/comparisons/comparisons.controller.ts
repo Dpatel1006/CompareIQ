@@ -26,7 +26,7 @@ import { TierLimitGuard } from '../../common/guards/tier-limit.guard';
 @ApiTags('Comparisons')
 @Controller('comparisons')
 export class ComparisonsController {
-  constructor(private readonly comparisonsService: ComparisonsService) { }
+  constructor(private readonly comparisonsService: ComparisonsService) {}
 
   @Post()
   @UseGuards(TierLimitGuard)

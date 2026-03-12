@@ -11,10 +11,17 @@ import { BillingModule } from './modules/billing/billing.module';
 import { MailModule } from './common/mail/mail.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RedisModule } from './common/redis/redis.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { loadAppConfig } from './config/app.config';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [loadAppConfig],
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -24,6 +31,9 @@ import { RedisModule } from './common/redis/redis.module';
     RedisModule,
     BillingModule,
     MailModule,
+    ScheduleModule.forRoot(),
+    NotificationsModule,
+    AdminModule,
   ],
   providers: [
     {
@@ -32,4 +42,4 @@ import { RedisModule } from './common/redis/redis.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

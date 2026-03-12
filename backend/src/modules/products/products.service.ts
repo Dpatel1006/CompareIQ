@@ -20,7 +20,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   async search(query: string, category?: string) {
     // First check local database
@@ -124,17 +124,24 @@ export class ProductsService {
         },
       });
 
-      // Background image fetching if missing
+      // Synchronous image fetching if missing
       if (!product.imageUrl) {
-        this.enrichProductWithImage(product.id, name).catch((err) =>
-          this.logger.error(`Failed to enrich product ${name} with image`, err),
-        );
+        try {
+          await this.enrichProductWithImage(product.id, name);
+        } catch (err) {
+          this.logger.error(`Failed to enrich product ${name} with image`, err);
+        }
       }
     } else if (!product.imageUrl) {
       // Also try for existing products missing images
-      this.enrichProductWithImage(product.id, name).catch((err) =>
-        this.logger.error(`Failed to enrich existing product ${name} with image`, err),
-      );
+      try {
+        await this.enrichProductWithImage(product.id, name);
+      } catch (err) {
+        this.logger.error(
+          `Failed to enrich existing product ${name} with image`,
+          err,
+        );
+      }
     }
 
     return product.id;
@@ -166,8 +173,21 @@ export class ProductsService {
       await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
       const imageUrl = await page.evaluate(() => {
-        // Bing Images selector for the first result thumbnail/image
-        const img = document.querySelector('.iusc img, .mimg') as HTMLImageElement;
+        // Look for the high-res image data in the 'm' attribute of '.iusc' wrapper
+        const el = document.querySelector('.iusc');
+        if (el) {
+          const mAttr = el.getAttribute('m');
+          if (mAttr) {
+            try {
+              const mData = JSON.parse(mAttr);
+              if (mData.murl) return mData.murl;
+            } catch (e) {}
+          }
+        }
+        // Fallback to thumbnail if high-res fails
+        const img = document.querySelector(
+          '.iusc img, .mimg',
+        ) as HTMLImageElement;
         return img ? img.src : null;
       });
 

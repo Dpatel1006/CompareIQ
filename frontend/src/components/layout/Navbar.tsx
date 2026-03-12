@@ -5,8 +5,19 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import {
   BarChart3, User, LogOut, CreditCard,
+  LayoutDashboard, GitCompare, History, Settings, Shield,
+  Menu, X
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+
+// ── Nav links base ────────────────────────────────────────────────────────────
+const BASE_NAV_LINKS = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/compare', label: 'Compare', icon: GitCompare },
+  { href: '/history', label: 'History', icon: History },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/pricing', label: 'Pricing', icon: CreditCard },
+];
 
 // ── Profile Dropdown ─────────────────────────────────────────────────────────
 function ProfileDropdown({ onClose }: { onClose: () => void }) {
@@ -123,16 +134,26 @@ export function Navbar() {
     ? user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() ?? 'U';
 
+  const navLinks = [...BASE_NAV_LINKS];
+  if (user?.role === 'ADMIN') {
+    navLinks.push({ href: '/admin', label: 'Admin', icon: Shield });
+  }
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on route change
+  useEffect(() => { setMobileMenuOpen(false); }, [pathname]);
+
   return (
     <header
       style={{
-        height: '56px',
+        height: '60px',
         width: '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 24px',
-        background: scrolled ? 'rgba(255,255,255,0.92)' : 'white',
+        background: scrolled ? 'rgba(255,255,255,1)' : 'white',
         backdropFilter: 'blur(10px)',
         borderBottom: '1px solid var(--border)',
         transition: 'all 0.2s ease',
@@ -141,22 +162,72 @@ export function Navbar() {
       }}
     >
       {/* ── LEFT: Logo ── */}
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <Link
-          href={isAuthenticated ? '/dashboard' : '/'}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}
-        >
-          <div style={{
-            width: 32, height: 32, borderRadius: '8px',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <BarChart3 style={{ width: 16, height: 16, color: 'white' }} />
-          </div>
-          <span style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-            CompareIQ
-          </span>
-        </Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+        <div className="flex items-center gap-4">
+          {/* Mobile Menu Toggle */}
+          {isAuthenticated && (
+            <button
+              className="md:hidden flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X style={{ width: 20, height: 20 }} /> : <Menu style={{ width: 20, height: 20 }} />}
+            </button>
+          )}
+
+          <Link
+            href={isAuthenticated ? '/dashboard' : '/'}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}
+          >
+            <div style={{
+              width: 32, height: 32, borderRadius: '8px',
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <BarChart3 style={{ width: 16, height: 16, color: 'white' }} />
+            </div>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+              CompareIQ
+            </span>
+          </Link>
+        </div>
+
+        {/* ── CENTER: Nav Links (Desktop) ── */}
+        {isAuthenticated && (
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: isActive ? 600 : 500,
+                    textDecoration: 'none',
+                    color: isActive ? '#6366f1' : 'var(--text-secondary)',
+                    background: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(0,0,0,0.04)'; }}
+                  onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; }}
+                >
+                  <link.icon
+                    style={{
+                      width: 16, height: 16, flexShrink: 0,
+                      color: isActive ? '#6366f1' : 'currentColor',
+                    }}
+                  />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
       {/* ── RIGHT: Auth/Profile ── */}
@@ -176,24 +247,70 @@ export function Navbar() {
         )}
 
         {isAuthenticated && (
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setProfileOpen((o) => !o)}
-              style={{
-                width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                color: 'white', fontWeight: 700, fontSize: '0.7rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: profileOpen ? '0 0 0 2px rgba(99,102,241,0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {initials}
-            </button>
-            {profileOpen && <ProfileDropdown onClose={() => setProfileOpen(false)} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* User Info (Desktop only) */}
+            <div className="hidden lg:flex flex-col items-end" style={{ lineHeight: 1.2 }}>
+               <p style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{user?.name || 'User'}</p>
+               <span style={{ fontSize: '10px', color: 'var(--brand-600)', fontWeight: 700, textTransform: 'uppercase' }}>{user?.tier || 'FREE'}</span>
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setProfileOpen((o) => !o)}
+                style={{
+                  width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  color: 'white', fontWeight: 700, fontSize: '0.85rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: profileOpen ? '0 0 0 2px rgba(99,102,241,0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {initials}
+              </button>
+              {profileOpen && <ProfileDropdown onClose={() => setProfileOpen(false)} />}
+            </div>
           </div>
         )}
       </div>
+
+      {/* ── MOBILE: Menu Drawer ── */}
+      {isAuthenticated && mobileMenuOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-[190] bg-black/40 backdrop-blur-sm animate-fade-in"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div
+            className="md:hidden fixed left-0 top-[60px] bottom-0 w-64 z-[200] bg-white border-right border-gray-200 shadow-2xl animate-slide-left p-4 flex flex-col gap-2"
+          >
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    fontSize: '0.95rem',
+                    fontWeight: isActive ? 600 : 500,
+                    textDecoration: 'none',
+                    color: isActive ? '#6366f1' : 'var(--text-secondary)',
+                    background: isActive ? 'rgba(99,102,241,0.08)' : 'transparent',
+                  }}
+                >
+                  <link.icon style={{ width: 18, height: 18 }} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
     </header>
   );
 }
